@@ -1,5 +1,7 @@
 import { v2 as cloudinary } from "cloudinary";
+import dotenv from "dotenv";
 import fs from "node:fs";
+dotenv.config();
 
 cloudinary.config({
   secure: true,
@@ -19,11 +21,11 @@ const uploadOnCloudinary = async (localFilePath) => {
       });
 
       console.log(result.url);
-      return response;
+      return result;
     }
   } catch (error) {
     fs.unlinkSync(localFilePath); //remove the locally saved temporary file
-
+    console.log(error, 1);
     return null;
   }
 };

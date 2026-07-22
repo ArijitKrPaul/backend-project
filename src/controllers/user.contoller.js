@@ -26,7 +26,9 @@ const userRegister = asyncHandler(async (req, res) => {
     throw new ApiError(400, "please fill out the empty field");
   }
 
-  const existingUser = User.findOne({ $or: [{ email }, { userName }] });
+  const existingUser = await User.findOne({ $or: [{ email }, { userName }] });
+
+  console.log(existingUser);
 
   if (existingUser) {
     throw new ApiError(409, "User already exists");
@@ -40,9 +42,9 @@ const userRegister = asyncHandler(async (req, res) => {
   }
 
   const avatarURL = await uploadOnCloudinary(avatarLocalPath);
-  const coverURL = await uploadOnCloudinary(coverLocalPath);
+  const coverImage = await uploadOnCloudinary(coverLocalPath);
 
-  if (!avatar) {
+  if (!avatarURL) {
     throw new ApiError(500, "avatar image couldnt be uploaded");
   }
 
