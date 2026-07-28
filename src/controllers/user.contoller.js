@@ -1,12 +1,14 @@
+import jwt from "jsonwebtoken";
 import User from "../models/user.models.js";
 import { ApiError } from "../utils/apiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import asyncHandler from "../utils/asyncHandler.js";
 import uploadOnCloudinary from "../utils/cloudinary.js";
 
-const generateAndRefreshToken = async (userId) => {
+const generateAccessAndRefreshToken = async (userId) => {
   try {
-    const user = User.findById(userId);
+    const user = await User.findById(userId);
+    console.log(user);
     const refreshToken = user.generateRefreshToken();
     const accessToken = user.generateAccessToken();
 
@@ -111,9 +113,11 @@ const loginUser = asyncHandler(async (req, res) => {
     throw new ApiError(409, "Invalid Password");
   }
 
-  const { refreshToken, accessToken } = await generateAndRefreshToken(user._id);
+  const { refreshToken, accessToken } = await generateAccessAndRefreshToken(
+    existingUser._id
+  );
 
-  const loggedInUser = await User.findById(user._id).select(
+  const loggedInUser = await User.findById(existingUser._id).select(
     "-password -refreshToken"
   );
 
@@ -148,7 +152,7 @@ const logoutUser = asyncHandler(async (req, res) => {
       },
     },
     {
-      new: true,
+      returnDocument: "after",
     }
   );
   const options = {
@@ -163,4 +167,54 @@ const logoutUser = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, {}, "user logged out successfully"));
 });
 
-export { loginUser, logoutUser, userRegister };
+const refreshAccessToken = asyncHandler(async (req, res) => {
+  //get refresh token from cookies
+  //verify and decode to get the id
+  //find the user based on id
+  //match the refresh token and if same generate a new access token
+
+  const incomingrefreshToken =
+    req.cookies.refreshToken || req.body.refreshToken;
+
+  if (!incomingrefreshToken) {
+    throw new ApiError(400, "Need to login again");
+  }
+
+  const decodedToken = jwt.verify(
+    incomingrefreshToken,
+    process.env.REFRESH_TOKEN_SECRET
+  );
+
+  const user = await User.findById(decodedToken._id).select("-password");
+
+  if (!user) {
+    throw new ApiError(404, "Invalid refresh token");
+  }
+
+  if (incomingrefreshToken !== user.refreshToken) {
+    throw new ApiError(400, "Refresh token is expired");
+  }
+
+  const options = {
+    httpOnly: true,
+    secure: true,
+  };
+
+  const { accessToken, newrefreshToken } = await generateAccessAndRefreshToken(
+    user._id
+  );
+
+  return res
+    .status(200)
+    .cookie("accessToken", accessToken)
+    .cookie("refreshToken", newrefreshToken)
+    .json(
+      new ApiResponse(
+        200,
+        { accessToken, newrefreshToken },
+        "Access Token refreshed successfully"
+      )
+    );
+});
+
+export { loginUser, logoutUser, refreshAccessToken, userRegister };
